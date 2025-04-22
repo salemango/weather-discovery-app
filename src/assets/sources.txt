@@ -1,0 +1,20 @@
+clear sky
+day: https://unsplash.com/photos/pink-blossoms-bloom-against-a-bright-blue-sky-BxGaO1FEz5A
+night: https://unsplash.com/photos/a-night-sky-with-stars-and-a-plane-in-the-foreground-18nR85wWyLY
+
+cloudy
+day: https://unsplash.com/photos/white-clouds-and-blue-sky-during-daytime-vXU_wJ7YmNc
+night: https://unsplash.com/photos/a-night-sky-with-stars-and-clouds-ElGwhG5o7iU
+
+rainy
+day: https://unsplash.com/photos/a-lot-of-raindrops-on-a-window-et8ofaNbWrM
+night: https://unsplash.com/photos/rain-drops-on-a-window-with-a-dark-background-RuRRrItEDrA
+
+snowy
+day: https://unsplash.com/photos/a-person-riding-skis-down-a-snow-covered-slope-dCWPOA0oTck
+night: https://unsplash.com/photos/a-group-of-trees-with-snow-6jwP43HCQi4
+
+thunderstorm 
+day: https://unsplash.com/photos/a-cloudy-sky-over-a-beach-with-a-boat-in-the-water-9hIJJghBqb0
+night: https://unsplash.com/photos/a-lightning-bolt-hitting-through-a-dark-cloudy-sky-gvG51y634T0
+
