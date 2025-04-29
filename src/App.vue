@@ -2,13 +2,14 @@
   <div id="app"
     :class="{ 
       'clear' : weatherCondition == 'Clear',
-      'cloudy' : weatherCondition == 'Clouds',
+      'cloudy' : weatherCondition == ('Clouds' || 'Haze' || 'Drizzle' || 'Fog' || 'Mist') ,
       'rainy' : weatherCondition == 'Rain',
       'snowy' : weatherCondition == 'Snow',
-      'stormy' : weatherCondition == 'Thunderstorm',
+      'stormy' : weatherCondition == ('Thunderstorm' || 'Tornado' || 'Squall' || 'Ash'),
       'dark': darkMode || isNight
      }">
   
+  <div class="background-filter" :class="{ 'dark' : darkMode || isNight }">
   <header>
     <input type="search" class="search-bar" :class="{ 'dark': darkMode || isNight }" placeholder="Search for a location..." v-model="query" @keyup.enter="searchNewLocation()">
     <img :src="getModeIcon()" @click="toggleDarkMode()" v-show="!isNight">
@@ -22,23 +23,28 @@
     </select>
     <img :src="getFavoriteIcon()" @click="saveLocation()">
   </div>
+
+  <p class="check-location" :class="{ 'dark': darkMode || isNight }" title="Enter the location you want, separated by commas and spaces, into the search bar. If you don't have the location you want, you may not have been specific enough. Try adding your state name and/or country name abbreviation after the search query.">Got the wrong location?</p>
   
-  <RouterView v-show="!loading"/>
+  <RouterView :weatherData='weatherData' :darkMode="darkMode" v-show="!loading"/>
 
   <nav>
-    <RouterLink to="/">Overview</RouterLink>
+    <RouterLink to="/">Current</RouterLink>
     <RouterLink to="/hourly-forecast">Hourly Forecast</RouterLink>
     <RouterLink to="/5-day-forecast">5 Day Forecast</RouterLink>
   </nav>
   </div>
+  </div>
 </template>
+
 
 <script>
 
 // Functionality
 import  { useDark, useToggle } from '@vueuse/core';
-import axios from 'axios';
-import { provide, ref } from 'vue';
+import { getData, getWeatherData } from './components/OpenWeatherAPI.js';
+
+
 
 // Icons 
 import lightModeIcon from './assets/light-mode.svg';
@@ -72,10 +78,8 @@ export default {
       sunriseTime: null,
       sunsetTime: null,
       
-      apiKey: '79159695d5493548f7e48890afac0eb2',
-      geocodingPrefix: 'http://api.openweathermap.org/geo/1.0/direct?q=',
-      oneCallPrefix: 'https://api.openweathermap.org/data/3.0/onecall?lat=',
       query: '',
+      querySave: 'Wake Forest',
       
       geocodingResults: null,
       lat: 35.9803138,
@@ -83,14 +87,12 @@ export default {
       loading: false,
       
       weatherData: null,
-      currentWeather: null,
       timezone: null,
       UNIXtime: null,
       currentTime: null,
       isNight: false,
     }
   },
-
   methods: {
     // Toggle dark mode 
     toggleDarkMode() { // Toggles dark mode based on time of day or user input
@@ -157,50 +159,55 @@ export default {
     },
 
     // Get data
-    getData() { // Get data on enter press - Working as intended
+    async getData() { // Get data on enter press - Working as intended
       this.loading = true;
-      this.query = this.formatQuery();
-      axios
-        .get(`${this.geocodingPrefix}${this.query}&limit=1&appid=${this.apiKey}`)
-        .then((response => {
-          this.geocodingResults = response.data;
-          this.geocodingResults = this.geocodingResults[0];
-          this.lat = this.geocodingResults.lat;
-          this.long = this.geocodingResults.lon;
-          if (this.geocodingResults.state) {
-            this.location = this.geocodingResults.name + ", " + this.geocodingResults.state + ", " + this.geocodingResults.country;
-          }
-          else {
-            this.location = this.geocodingResults.name + ", " + this.geocodingResults.country;
-          }
-          
-          this.getWeatherData();
-        }));
+      this.geocodingResults = await getData(this.query);
+  
     
-      this.loading = false;
+      this.lat = this.geocodingResults.lat;
+      this.long = this.geocodingResults.lon;
+
+      if (this.geocodingResults.state) {
+        this.location = this.geocodingResults.name + ", " + this.geocodingResults.state + ", " + this.geocodingResults.country;
+      }
+      else {
+        this.location = this.geocodingResults.name + ", " + this.geocodingResults.country;
+      }
+
+      this.weatherData = await getWeatherData(this.lat, this.long);
+
+      this.weatherData.current.weather = this.weatherData.current.weather[0];
+
+      this.weatherCondition = this.weatherData.current.weather.main;  
+
+      this.UNIXtime = this.weatherData.current.dt;
+      this.timezone = this.weatherData.timezone_offset;
+      this.UNIXtoNormal();
+
+      this.querySave = this.query;
       this.query = '';
+
+      this.loading = false;
     },
-    getWeatherData() {
-      axios 
-        .get(`${this.oneCallPrefix}${this.lat}&lon=${this.long}&units=imperial&appid=${this.apiKey}`)
-        .then((response => {
-          this.weatherData = response.data;
-          this.currentWeather = this.weatherData.current.weather;
-          this.currentWeather = this.currentWeather[0];
-          this.weatherCondition = this.currentWeather.main;
-          this.UNIXtime = this.weatherData.current.dt;
-          this.timezone = this.weatherData.timezone_offset;
-          this.UNIXtoNormal();
-        })); 
-      return;      
+    async getWeatherData() {
+      this.weatherData = await getWeatherData(this.lat, this.long); // Note: Might not return value as expected
+      
+      this.weatherData.current.weather = this.weatherData.current.weather[0];
+
+      this.weatherCondition = this.weatherData.current.weather.main;
+
+      this.UNIXtime = this.weatherData.current.dt;
+      this.timezone = this.weatherData.timezone_offset;
+
+      this.UNIXtoNormal();
+
+      return; 
     },
 
     // Data formatting 
-    formatQuery() { // Replace spaces in query with dash -- works as intended
-      return this.query.replace(/ /g, "-");
-    },
+    
     UNIXtoNormal() {
-        
+
         // Get current time
           this.UNIXtime = this.UNIXtime + this.timezone;
           let date =  new Date(this.UNIXtime * 1000);
@@ -246,15 +253,12 @@ export default {
       }
       return;
     },
-    setup() {
-      const reactiveWeatherData = ref(this.weatherData);
-      provide('weatherData', reactiveWeatherData);
-    }
+
   }, 
 
   // Mounted -- gets weather data for Wake Forest, a placeholder location
-  mounted() {
-      this.getWeatherData();
+  async mounted() {
+      await this.getWeatherData();
     } 
 }
 
@@ -273,8 +277,10 @@ export default {
     background-size: cover;
     background-position: center;
     min-height: 100vh;
+    overflow: hidden;
     transition: 1s ease all;
     font-family: 'Open Sans', Arial, Helvetica, sans-serif;
+    filter:saturate(.7);
   }
 
   /* App background possibilities */
@@ -319,6 +325,18 @@ export default {
     }
   /* End */
 
+
+  /* App background filter */
+
+  .background-filter {
+    height: 100vh;
+    background: linear-gradient(rgba(189, 189, 189, 0.4), rgba(156, 156, 156, 0.4)); 
+  }
+
+  .background-filter.dark {
+    background: linear-gradient(rgba(46, 46, 46, 0.4), rgba(0, 0, 0, 0.4));
+  }
+  
   header {
     display: flex;
     gap: 5%;
@@ -334,7 +352,7 @@ export default {
   input[type="search"] {
     font-family: 'Open Sans', Arial, Helvetica, sans-serif;
     border: none;
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.7);
     color: #06293f;
     font-size: 15pt;
     border-radius: 0px 10px;
@@ -384,7 +402,7 @@ export default {
   }
 
   select {
-    background-color: transparent;
+    background: none;
     border: none;
     color: #06293f;
     font-size: 16pt;
@@ -394,7 +412,6 @@ export default {
   }
 
   select:focus {
-    background-color: rgba(255, 255, 255, 0.5);
     border-radius: 5px;
   }
 
@@ -408,11 +425,25 @@ export default {
     cursor: pointer;
   }
 
+.check-location {
+  display: none;
+  color: #0a4264;
+  font-size: 11pt;
+  font-weight: 600;
+  text-align: center;
+  cursor: help;
+}
+
+.check-location.dark {
+  color: #caddf4;
+}
+
+
 nav {
   display: flex;
   flex-wrap: wrap;
   margin-top: 20px;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
   align-content: center;
   text-align: center;
@@ -486,6 +517,12 @@ nav a.active-link {
     padding: .5% 2%;
   }
 
+  .check-location {
+    display: block;
+    font-size: 12pt;
+    margin: 0 auto;
+  }
+  
   nav a {
     padding: 1.5% 5%;
     font-size: 20pt;
@@ -497,6 +534,10 @@ nav a.active-link {
   input[type="search"] {
     padding: .5% 1%;
     font-size: 16pt;
+  }
+
+  nav a {
+    padding: 1% 5%;
   }
 }
 
